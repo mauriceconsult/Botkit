@@ -4,8 +4,9 @@
     "private": true,
     "type": "module",
     "dependencies": {
+        "@botkit/core": "workspace:*",
         "commander": "^15.0.0",
-        "@botkit/core": "workspace:*"
+        "zod": "^4.6.5"
     },
     "devDependencies": {
         "@types/node": "^26.4.1"
