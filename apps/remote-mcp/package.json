@@ -6,21 +6,20 @@
     "exports": {
         ".": "./src/index.ts"
     },
-    "scripts": {
-        "dev:cli": "bun run packages/cli/src/index.ts",
-        "dev:local-mcp": "bun run packages/mcp-server/src/index.ts",
-        "dev:remote-mcp": "bun run apps/remote-mcp/src/index.ts"
-    },
+  "scripts": {
+    "dev": "bun run --hot src/index.ts",
+    "start": "bun run src/index.ts"
+},
     "devDependencies": {
         "@types/node": "^22.20.3"
     },
     "dependencies": {
-        "@modelcontextprotocol/sdk": "^1.30.0",
-        "hono": "^4.13.8",
-        "@hono/mcp": "^0.3.2",
-        "@clerk/backend": "^2.0.0",
-        "@clerk/mcp-tools": "^0.1.0",
         "@botkit/core": "workspace:*",
-        "@botkit/mcp-tools": "workspace:*"
+        "@botkit/mcp-tools": "workspace:*",
+        "@clerk/backend": "^3.18.1",
+        "@clerk/mcp-tools": "^0.6.0",
+        "@hono/mcp": "^0.3.2",
+        "@modelcontextprotocol/sdk": "^1.30.0",
+        "hono": "^4.13.8"
     }
 }
