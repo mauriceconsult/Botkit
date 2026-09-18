@@ -1,0 +1,14 @@
+{
+    "name": "@botkit/mcp-tools",
+    "version": "0.0.1",
+    "private": true,
+    "type": "module",
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.30.0",
+        "zod": "^3.24.0",
+        "@botkit/core": "workspace:*"
+    },
+    "devDependencies": {
+        "@types/node": "^22.20.3"
+    }
+}

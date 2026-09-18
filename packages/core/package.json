@@ -1,0 +1,18 @@
+{
+  "name": "@botkit/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "exports": {
+    "./clients/maxintel.js": "./src/clients/maxintel.ts"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.6.0",
+    "typescript": "^5.7.0"
+  }
+}
