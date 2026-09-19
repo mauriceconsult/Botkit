@@ -8,9 +8,7 @@ import { registerAllTools } from "@botkit/mcp-tools";
 const clerkPublishableKey = process.env.CLERK_PUBLISHABLE_KEY;
 const clerkSecretKey = process.env.CLERK_SECRET_KEY;
 if (!clerkPublishableKey || !clerkSecretKey) {
-  throw new Error(
-    "Missing Clerk keys. Set CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY in your environment.",
-  );
+  throw new Error("Missing CLERK_PUBLISHABLE_KEY or CLERK_SECRET_KEY");
 }
 
 const RESOURCE_URL =
@@ -29,7 +27,6 @@ function sendUnauthorized(c: Context) {
   return c.json({ error: "Unauthorized" }, 401);
 }
 
-// ── RFC 9728 discovery endpoint — unauthenticated ──────────────────────────────────
 app.get("/.well-known/oauth-protected-resource", (c) =>
   c.json(
     generateClerkProtectedResourceMetadata({
@@ -39,34 +36,23 @@ app.get("/.well-known/oauth-protected-resource", (c) =>
   ),
 );
 
-// ── MCP endpoint — Clerk-authenticated ──────────────────────────────────────────────
 app.all("/mcp", async (c) => {
-  const authHeader = c.req.header("authorization");
-  const token = authHeader?.replace(/^Bearer\s+/i, "");
+  const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return sendUnauthorized(c);
 
-  let verification;
-  try {
-    verification = await verifyToken(token, {
-      secretKey: clerkSecretKey,
-      authorizedParties: ALLOWED_ORIGINS,
-    });
-  } catch {
-    return sendUnauthorized(c);
-  }
+  const verification = await verifyToken(token, {
+    secretKey: clerkSecretKey,
+    authorizedParties: ALLOWED_ORIGINS,
+  });
 
-  const claims =
-    verification && "data" in verification && verification.data
-      ? (verification.data as { sub?: string })
-      : undefined;
+  if (verification.errors || !verification.data) return sendUnauthorized(c);
 
-  if (!claims?.sub || verification.errors) return sendUnauthorized(c);
+  const claims = verification.data as { sub?: unknown };
+  const userId = typeof claims.sub === "string" ? claims.sub : undefined;
+  if (!userId) return sendUnauthorized(c);
 
-  // Fresh McpServer + transport per request — required for stateless safety
-  // (CVE-2026-25536: shared instances leak responses across concurrent clients),
-  // and the cleanest way to close over this request's authenticated userId.
   const server = new McpServer({ name: "botkit-remote-mcp", version: "0.0.1" });
-  registerAllTools(server, { userId: claims.sub });
+  registerAllTools(server, { userId });
 
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
@@ -76,14 +62,4 @@ app.all("/mcp", async (c) => {
 app.get("/health", (c) => c.json({ status: "ok" }));
 app.notFound((c) => c.json({ error: "Not Found" }, 404));
 
-const port = Number(process.env.PORT ?? 3001);
-
-export default {
-  port,
-  fetch: (req: Request) => {
-    const url = new URL(req.url);
-    url.protocol = req.headers.get("x-forwarded-proto") ?? url.protocol;
-    url.host = req.headers.get("x-forwarded-host") ?? url.host;
-    return app.fetch(new Request(url.toString(), req));
-  },
-};
+export default app;

@@ -6,11 +6,13 @@
     "exports": {
         ".": "./src/index.ts"
     },
-  "scripts": {
-    "dev": "bun run --hot src/index.ts",
-    "start": "bun run src/index.ts"
-},
+    "scripts": {
+      "dev": "bun run --hot src/index.ts",
+  "build": "bun build src/index.ts --outdir dist --target node",
+  "start": "bun run dist/index.js"
+    },
     "devDependencies": {
+        "@types/bun": "^1.4.2",
         "@types/node": "^22.20.3"
     },
     "dependencies": {

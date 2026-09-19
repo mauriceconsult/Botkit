@@ -8,7 +8,12 @@
     "scripts": {
         "dev:cli": "bun run --filter=@botkit/cli dev",
         "dev:local-mcp": "bun run --filter=@botkit/mcp-server dev",
-        "dev:remote-mcp": "bun run --filter=botkit-remote-mcp dev"
+        "dev:remote-mcp": "bun run --filter=botkit-remote-mcp dev",
+          "build:core": "bun run --filter @botkit/core build",
+  "build:mcp-tools": "bun run --filter @botkit/mcp-tools build",
+  "build:packages": "bun run build:core && bun run build:mcp-tools",
+  "build:remote-mcp": "bun run build:packages && bun run --filter botkit-remote-mcp build",
+  "build": "bun run build:packages && bun run build:remote-mcp"
     },
     "devDependencies": {
         "@types/bun": "^1.3.9",

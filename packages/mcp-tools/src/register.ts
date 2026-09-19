@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { generateMaxintelText } from "@botkit/core/clients/maxintel.js";
+import { generateMaxintelText } from "../../core/src/clients/maxintel";
 
 export function registerAllTools(server: McpServer) {
   server.registerTool(

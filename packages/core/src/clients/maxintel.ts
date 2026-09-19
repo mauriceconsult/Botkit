@@ -25,6 +25,16 @@ export interface GenerateResult {
   };
 }
 
+export interface SendMessageParams {
+  chatId: string;
+  message: string;
+}
+
+export interface SendMessageResult {
+  chatId: string;
+  status: string;
+}
+
 export async function generateMaxintelText(
   params: GenerateParams,
 ): Promise<GenerateResult> {
@@ -32,4 +42,16 @@ export async function generateMaxintelText(
     method: "POST",
     body: JSON.stringify(params),
   });
+}
+
+export async function sendMaxintelMessage(
+  params: SendMessageParams,
+): Promise<SendMessageResult> {
+  return platformRequest<SendMessageResult>(
+    `/v1/maxintel/chats/${encodeURIComponent(params.chatId)}/messages`,
+    {
+      method: "POST",
+      body: JSON.stringify({ message: params.message }),
+    },
+  );
 }

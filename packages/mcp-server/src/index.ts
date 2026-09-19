@@ -1,7 +1,7 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
-import { generateMaxintelText } from "@botkit/core/clients/maxintel.js";
+import { generateMaxintelText } from "../../core/src/clients/maxintel";
 
 const server = new McpServer({
   name: "maxnovate-mcp",

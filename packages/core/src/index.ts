@@ -1,5 +1,5 @@
 import { Command } from "commander";
-import { sendMaxintelMessage } from "@botkit/core/clients/maxintel.js";
+import { sendMaxintelMessage } from "./clients/maxintel";
 
 const program = new Command();
 

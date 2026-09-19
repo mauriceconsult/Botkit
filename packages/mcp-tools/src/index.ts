@@ -1,6 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { generateMaxintelText } from "@botkit/core/clients/maxintel.js";
+import { generateMaxintelText } from "../../core/src/clients/maxintel";
 import { postDukabodaDelivery } from "../../core/src/clients/dukaboda";
 import { postInstaskulAnnouncement } from "../../core/src/clients/instakul";
 import { postZuriaListing } from "../../core/src/clients/zuria";
@@ -34,7 +34,7 @@ export function registerAllTools(server: McpServer, ctx: ToolContext) {
     },
   );
 
-    server.registerTool(
+  server.registerTool(
     "instaskul_post_announcement",
     {
       title: "Post Instaskul Announcement",
@@ -57,7 +57,6 @@ export function registerAllTools(server: McpServer, ctx: ToolContext) {
     },
   );
 
-
   server.registerTool(
     "zuria_post_listing",
     {
@@ -77,7 +76,6 @@ export function registerAllTools(server: McpServer, ctx: ToolContext) {
       };
     },
   );
-
 
   server.registerTool(
     "dukaboda_post_delivery",
@@ -103,4 +101,3 @@ export function registerAllTools(server: McpServer, ctx: ToolContext) {
     },
   );
 }
-
