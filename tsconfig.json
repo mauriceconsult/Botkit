@@ -5,6 +5,10 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "types": ["node", "bun"],
-    "skipLibCheck": true
+    "skipLibCheck": true,
+
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true
   }
 }
