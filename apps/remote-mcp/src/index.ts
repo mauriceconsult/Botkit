@@ -2,11 +2,24 @@ import { Hono, type Context } from "hono";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPTransport } from "@hono/mcp";
 import { verifyToken } from "@clerk/backend";
-import { generateClerkProtectedResourceMetadata } from "@clerk/mcp-tools/server";
+import {
+  generateClerkProtectedResourceMetadata,
+  generateProtectedResourceMetadata,
+} from "@clerk/mcp-tools/server";
 import { registerAllTools } from "@botkit/mcp-tools";
 
-const clerkPublishableKey = process.env.CLERK_PUBLISHABLE_KEY;
-const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+const clerkPublishableKey = process.env.CLERK_PUBLISHABLE_KEY?.trim().replace(
+  /^['"]|['"]$/g,
+  "",
+);
+const clerkFrontendApi = process.env.CLERK_FRONTEND_API?.trim().replace(
+  /^['"]|['"]$/g,
+  "",
+);
+const clerkSecretKey = process.env.CLERK_SECRET_KEY?.trim().replace(
+  /^['"]|['"]$/g,
+  "",
+);
 if (!clerkPublishableKey || !clerkSecretKey) {
   throw new Error("Missing CLERK_PUBLISHABLE_KEY or CLERK_SECRET_KEY");
 }
@@ -29,10 +42,15 @@ function sendUnauthorized(c: Context) {
 
 app.get("/.well-known/oauth-protected-resource", (c) =>
   c.json(
-    generateClerkProtectedResourceMetadata({
-      publishableKey: clerkPublishableKey,
-      resourceUrl: RESOURCE_URL,
-    }),
+    clerkFrontendApi?.startsWith("https://")
+      ? generateProtectedResourceMetadata({
+          authServerUrl: clerkFrontendApi,
+          resourceUrl: RESOURCE_URL,
+        })
+      : generateClerkProtectedResourceMetadata({
+          publishableKey: clerkPublishableKey,
+          resourceUrl: RESOURCE_URL,
+        }),
   ),
 );
 
