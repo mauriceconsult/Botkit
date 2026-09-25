@@ -2,14 +2,20 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { generateMaxintelText } from "../../core/src/clients/maxintel";
 import { postDukabodaDelivery } from "../../core/src/clients/dukaboda";
-import { postInstaskulAnnouncement } from "../../core/src/clients/instakul";
+import { postInstaskulAnnouncement } from "../../core/src/clients/instaskul";
 import { postZuriaListing } from "../../core/src/clients/zuria";
+
+import { registerInstaskulTools } from "./instaskul.js";
+import { registerMaxintelTools } from "./maxintel";
+
 
 export interface ToolContext {
   userId: string;
 }
 
 export function registerAllTools(server: McpServer, ctx: ToolContext) {
+  registerMaxintelTools(server, ctx);
+  registerInstaskulTools(server, ctx);
   server.registerTool(
     "maxintel_generate",
     {

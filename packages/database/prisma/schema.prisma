@@ -1,0 +1,37 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+enum ConnectionProvider {
+  anthropic
+  openai
+  google
+  maxintel
+  instaskul
+  dukaboda
+  zuria
+}
+
+enum ConnectionKind {
+  ai_byok
+  ai_routed
+  product_oauth
+}
+
+model AccountConnection {
+  id              String             @id @default(uuid())
+  userId          String
+  provider        ConnectionProvider
+  kind            ConnectionKind
+  encryptedSecret String? // BYOK key (raw), or JSON-encoded {accessToken, refreshToken, expiresAt} for product_oauth — encrypted either way
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([userId, provider])
+}

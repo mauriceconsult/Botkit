@@ -50,6 +50,16 @@ program
     // not packages/core directly — see note above on why
   });
 
+  // packages/cli — new command
+program.command("connect").command("instaskul").action(async () => {
+  const tokens = await runOAuthConnect({
+    frontendApi: process.env.INSTASKUL_CLERK_FRONTEND_API!,
+    clientId: process.env.INSTASKUL_CLERK_OAUTH_CLIENT_ID!,
+    callbackPort: 4322, // distinct from botkit's own 4321
+  });
+  // store encrypted in AccountConnection, provider: "instaskul", kind: "product_oauth"
+});
+
 await program.parseAsync(process.argv).catch((err) => {
   console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
   process.exit(1);
