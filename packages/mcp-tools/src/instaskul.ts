@@ -1,10 +1,39 @@
-// packages/mcp-tools/src/instaskul.ts
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import * as instaskul from "../../core/src/clients/instaskul";
-import { ToolContext } from "./types";
+import * as instaskul from "@botkit/core/clients/instaskul.js";
+import type { ToolContext } from "./types.js";
+
+function textResult(text: string) {
+  return { content: [{ type: "text" as const, text }] };
+}
 
 export function registerInstaskulTools(server: McpServer, ctx: ToolContext) {
+  server.registerTool(
+    "instaskul_create_course",
+    {
+      title: "Create Instaskul Course",
+      description: "Add a new course.",
+      inputSchema: { title: z.string() },
+    },
+    async ({ title }) => {
+      const result = await instaskul.createInstaskulCourse(ctx.userId, title);
+      return textResult(`Created (id: ${result.id})`);
+    },
+  );
+
+  server.registerTool(
+    "instaskul_list_courses",
+    {
+      title: "List Instaskul Courses",
+      description: "List all courses.",
+      inputSchema: {},
+    },
+    async () =>
+      textResult(
+        JSON.stringify(await instaskul.listInstaskulCourses(ctx.userId)),
+      ),
+  );
+
   server.registerTool(
     "instaskul_create_coursework",
     {
@@ -18,13 +47,10 @@ export function registerInstaskulTools(server: McpServer, ctx: ToolContext) {
         courseId,
         title,
       );
-      return {
-        content: [
-          { type: "text" as const, text: `Created (id: ${result.id})` },
-        ],
-      };
+      return textResult(`Created (id: ${result.id})`);
     },
   );
+
   server.registerTool(
     "instaskul_list_coursework",
     {
@@ -32,15 +58,16 @@ export function registerInstaskulTools(server: McpServer, ctx: ToolContext) {
       description: "List coursework in a course.",
       inputSchema: { courseId: z.string() },
     },
-    async ({ courseId }) => {
-      const results = await instaskul.listInstaskulCoursework(
-        ctx.userId,
-        courseId,
-      );
-      return {
-        content: [{ type: "text" as const, text: JSON.stringify(results) }],
-      };
-    },
+    async ({ courseId }) =>
+      textResult(
+        JSON.stringify(
+          await instaskul.listInstaskulCoursework(ctx.userId, courseId),
+        ),
+      ),
   );
-  // same pair-shape for: course, coursenoticeboard, tutorial (+ assignment nested), noticeboard
+
+  // instaskul_create_coursenoticeboard / instaskul_list_coursenoticeboards — same courseId-scoped shape as coursework
+  // instaskul_create_tutorial / instaskul_list_tutorials — same courseId-scoped shape
+  // instaskul_create_assignment / instaskul_list_assignments — courseId + tutorialId scoped
+  // instaskul_create_noticeboard / instaskul_list_noticeboards — same as course, no parent id
 }

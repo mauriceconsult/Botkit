@@ -1,8 +1,7 @@
 // packages/cli/src/index.ts
 import { Command } from "commander";
 import { loadConfig, saveConfig, clearConfig } from "./lib/config.js";
-import { runOAuthLogin } from "./lib/oauth.js";
-
+import { runOAuthConnect, runOAuthLogin } from "./lib/oauth.js";
 
 const program = new Command();
 program.name("botkit").description("Botkit CLI");
@@ -51,16 +50,40 @@ program
   });
 
   // packages/cli — new command
-program.command("connect").command("instaskul").action(async () => {
-  const tokens = await runOAuthConnect({
-    frontendApi: process.env.INSTASKUL_CLERK_FRONTEND_API!,
-    clientId: process.env.INSTASKUL_CLERK_OAUTH_CLIENT_ID!,
-    callbackPort: 4322, // distinct from botkit's own 4321
-  });
-  // store encrypted in AccountConnection, provider: "instaskul", kind: "product_oauth"
-});
+program
+  .command("connect")
+  .command("instaskul")
+  .action(async () => {
+    const config = loadConfig();
+    if (!config.accessToken) {
+      console.error("Not logged in. Run `botkit login` first.");
+      process.exit(1);
+    }
 
-await program.parseAsync(process.argv).catch((err) => {
-  console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-  process.exit(1);
-});
+    const instaskulTokens = await runOAuthConnect({
+      frontendApi: process.env.INSTASKUL_CLERK_FRONTEND_API!,
+      clientId: process.env.INSTASKUL_CLERK_OAUTH_CLIENT_ID!,
+      callbackPort: 4322,
+    });
+
+    const res = await fetch(
+      `${process.env.BOTKIT_REMOTE_MCP_URL}/connections`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${config.accessToken}`,
+        },
+        body: JSON.stringify({
+          provider: "instaskul",
+          kind: "product_oauth",
+          tokens: instaskulTokens,
+        }),
+      },
+    );
+    if (!res.ok) {
+      console.error("Failed to save connection:", await res.text());
+      process.exit(1);
+    }
+    console.log("Instaskul connected.");
+  });

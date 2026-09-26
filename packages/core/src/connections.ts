@@ -1,14 +1,32 @@
-// packages/core/src/connections.ts
 import { db } from "@botkit/database";
-import { decrypt } from "./crypto";
-// import { decrypt } from "./crypto.js"; // the encryption utility from the AccountConnection design
+import { encrypt, decrypt } from "./crypto.js";
+
+export async function saveConnection(
+  userId: string,
+  provider: string,
+  kind: "ai_byok" | "ai_routed" | "product_oauth",
+  secret: unknown,
+) {
+  const encryptedSecret = encrypt(JSON.stringify(secret));
+  await db.accountConnection.upsert({
+    where: { userId_provider: { userId, provider: provider as any } },
+    create: {
+      userId,
+      provider: provider as any,
+      kind: kind as any,
+      encryptedSecret,
+      isActive: true,
+    },
+    update: { kind: kind as any, encryptedSecret, isActive: true },
+  });
+}
 
 export async function getConnectionToken(
   userId: string,
   provider: string,
 ): Promise<string> {
   const connection = await db.accountConnection.findUnique({
-    where: { userId_provider: { userId, provider } },
+    where: { userId_provider: { userId, provider: provider as any } },
   });
   if (!connection?.isActive || !connection.encryptedSecret) {
     throw new Error(
@@ -16,6 +34,5 @@ export async function getConnectionToken(
     );
   }
   const secret = JSON.parse(decrypt(connection.encryptedSecret));
-  // TODO once refresh is wired: check secret.expiresAt, refresh via TOKEN_URL if needed
   return secret.accessToken;
 }

@@ -1,33 +1,39 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 
-const keyMaterial =
-  process.env.BOTKIT_ENCRYPTION_KEY ?? "botkit-dev-32-byte-secret-key-123";
-const encryptionKey = Buffer.from(
-  keyMaterial.padEnd(32, "0").slice(0, 32),
-  "utf8",
-);
+const ALGORITHM = "aes-256-gcm";
+const IV_LENGTH = 12;
+const AUTH_TAG_LENGTH = 16;
 
-export function encrypt(value: string): string {
-  const iv = randomBytes(16);
-  const cipher = createCipheriv("aes-256-cbc", encryptionKey, iv);
-  const encrypted = Buffer.concat([
-    cipher.update(value, "utf8"),
-    cipher.final(),
-  ]);
-  return `${iv.toString("hex")}:${encrypted.toString("hex")}`;
+function getKey(): Buffer {
+  const keyHex = process.env.BOTKIT_ENCRYPTION_KEY;
+  if (!keyHex) throw new Error("BOTKIT_ENCRYPTION_KEY is not configured");
+  const key = Buffer.from(keyHex, "hex");
+  if (key.length !== 32)
+    throw new Error("BOTKIT_ENCRYPTION_KEY must be 32 bytes (64 hex chars)");
+  return key;
 }
 
-export function decrypt(value: string): string {
-  const [ivHex, encryptedHex] = value.split(":");
-  if (!ivHex || !encryptedHex) {
-    throw new Error("Invalid encrypted payload");
-  }
-
-  const iv = Buffer.from(ivHex, "hex");
-  const encrypted = Buffer.from(encryptedHex, "hex");
-  const decipher = createDecipheriv("aes-256-cbc", encryptionKey, iv);
-
-  return Buffer.concat([decipher.update(encrypted), decipher.final()]).toString(
-    "utf8",
+export function encrypt(plaintext: string): string {
+  const iv = randomBytes(IV_LENGTH);
+  const cipher = createCipheriv(ALGORITHM, getKey(), iv);
+  const ciphertext = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ]);
+  return Buffer.concat([iv, cipher.getAuthTag(), ciphertext]).toString(
+    "base64",
   );
+}
+
+export function decrypt(payload: string): string {
+  const raw = Buffer.from(payload, "base64");
+  const iv = raw.subarray(0, IV_LENGTH);
+  const authTag = raw.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH);
+  const ciphertext = raw.subarray(IV_LENGTH + AUTH_TAG_LENGTH);
+  const decipher = createDecipheriv(ALGORITHM, getKey(), iv);
+  decipher.setAuthTag(authTag);
+  return Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ]).toString("utf8");
 }

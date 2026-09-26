@@ -6,6 +6,7 @@ import {
   generateClerkProtectedResourceMetadata,
   generateProtectedResourceMetadata,
 } from "@clerk/mcp-tools/server";
+import { saveConnection } from "@botkit/core";
 import { registerAllTools } from "@botkit/mcp-tools";
 
 const clerkPublishableKey = process.env.CLERK_PUBLISHABLE_KEY?.trim().replace(
@@ -75,6 +76,25 @@ app.all("/mcp", async (c) => {
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
   return transport.handleRequest(c);
+});
+
+// apps/remote-mcp/src/index.ts — add alongside the existing /mcp route
+app.post("/connections", async (c) => {
+  const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
+  if (!token) return sendUnauthorized(c);
+
+  const verification = await verifyToken(token, {
+    secretKey: clerkSecretKey,
+    authorizedParties: ALLOWED_ORIGINS,
+  });
+  if (verification.errors || !verification.data) return sendUnauthorized(c);
+
+  const claims = verification.data as { sub?: string };
+  if (!claims.sub) return sendUnauthorized(c);
+
+  const { provider, kind, tokens } = await c.req.json();
+  await saveConnection(claims.sub, provider, kind, tokens);
+  return c.json({ status: "ok" });
 });
 
 app.get("/health", (c) => c.json({ status: "ok" }));
