@@ -52,38 +52,46 @@ program
   // packages/cli — new command
 program
   .command("connect")
-  .command("instaskul")
-  .action(async () => {
+  .argument("<provider>", "Which provider to connect (e.g. instaskul)")
+  .action(async (provider: string) => {
     const config = loadConfig();
     if (!config.accessToken) {
       console.error("Not logged in. Run `botkit login` first.");
       process.exit(1);
     }
 
-    const instaskulTokens = await runOAuthConnect({
-      frontendApi: process.env.INSTASKUL_CLERK_FRONTEND_API!,
-      clientId: process.env.INSTASKUL_CLERK_OAUTH_CLIENT_ID!,
-      callbackPort: 4322,
-    });
-
-    const res = await fetch(
-      `${process.env.BOTKIT_REMOTE_MCP_URL}/connections`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${config.accessToken}`,
+    if (provider === "instaskul") {
+      const tokens = await runOAuthConnect({
+        frontendApi: process.env.INSTASKUL_CLERK_FRONTEND_API!,
+        clientId: process.env.INSTASKUL_CLERK_OAUTH_CLIENT_ID!,
+        callbackPort: 4322,
+      });
+      const res = await fetch(
+        `${process.env.BOTKIT_REMOTE_MCP_URL}/connections`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.accessToken}`,
+          },
+          body: JSON.stringify({
+            provider: "instaskul",
+            kind: "product_oauth",
+            tokens,
+          }),
         },
-        body: JSON.stringify({
-          provider: "instaskul",
-          kind: "product_oauth",
-          tokens: instaskulTokens,
-        }),
-      },
-    );
-    if (!res.ok) {
-      console.error("Failed to save connection:", await res.text());
+      );
+      if (!res.ok) {
+        console.error("Failed to save connection:", await res.text());
+        process.exit(1);
+      }
+      console.log("Instaskul connected.");
+    } else {
+      console.error(`Unknown provider: ${provider}`);
       process.exit(1);
     }
-    console.log("Instaskul connected.");
+  });
+  program.parseAsync(process.argv).catch((err) => {
+    console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+    process.exit(1);
   });
