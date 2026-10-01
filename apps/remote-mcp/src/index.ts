@@ -35,6 +35,18 @@ function sendUnauthorized(c: Context) {
   return c.json({ error: "Unauthorized" }, 401);
 }
 
+async function verifyClerkToken(token: string) {
+  if (!clerkSecretKey) return undefined;
+  try {
+    return await verifyToken(token, {
+      secretKey: clerkSecretKey,
+      authorizedParties: ALLOWED_ORIGINS,
+    });
+  } catch {
+    return undefined;
+  }
+}
+
 app.get("/.well-known/oauth-protected-resource", (c) => {
   if (clerkFrontendApi?.startsWith("https://")) {
     return c.json(
@@ -65,12 +77,11 @@ app.all("/mcp", async (c) => {
     return c.json({ error: "CLERK_SECRET_KEY is not configured" }, 503);
   }
 
-  const verification = await verifyToken(token, {
-    secretKey: clerkSecretKey,
-    authorizedParties: ALLOWED_ORIGINS,
-  });
+  const verification = await verifyClerkToken(token);
 
-  if (verification.errors || !verification.data) return sendUnauthorized(c);
+  if (!verification || verification.errors || !verification.data) {
+    return sendUnauthorized(c);
+  }
 
   const claims = verification.data as { sub?: unknown };
   const userId = typeof claims.sub === "string" ? claims.sub : undefined;
@@ -93,16 +104,47 @@ app.post("/connections", async (c) => {
     return c.json({ error: "CLERK_SECRET_KEY is not configured" }, 503);
   }
 
-  const verification = await verifyToken(token, {
-    secretKey: clerkSecretKey,
-    authorizedParties: ALLOWED_ORIGINS,
-  });
-  if (verification.errors || !verification.data) return sendUnauthorized(c);
+  const verification = await verifyClerkToken(token);
+  if (!verification || verification.errors || !verification.data) {
+    return sendUnauthorized(c);
+  }
 
   const claims = verification.data as { sub?: string };
   if (!claims.sub) return sendUnauthorized(c);
 
-  const { provider, kind, tokens } = await c.req.json();
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ error: "Invalid JSON body" }, 400);
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return c.json({ error: "Invalid connection body" }, 400);
+  }
+
+  const { provider, kind, tokens } = body as Record<string, unknown>;
+  const providers = [
+    "anthropic",
+    "openai",
+    "google",
+    "maxintel",
+    "instaskul",
+    "dukaboda",
+    "zuria",
+  ];
+  const kinds = ["ai_byok", "ai_routed", "product_oauth"];
+  if (
+    typeof provider !== "string" ||
+    !providers.includes(provider) ||
+    typeof kind !== "string" ||
+    !kinds.includes(kind) ||
+    !tokens ||
+    typeof tokens !== "object" ||
+    Array.isArray(tokens)
+  ) {
+    return c.json({ error: "Invalid connection body" }, 400);
+  }
+
   const { saveConnection } = await import("@botkit/core");
   await saveConnection(claims.sub, provider, kind, tokens);
   return c.json({ status: "ok" });
