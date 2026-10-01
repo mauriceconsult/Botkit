@@ -49,7 +49,7 @@ program
     // not packages/core directly — see note above on why
   });
 
-  // packages/cli — new command
+// packages/cli — new command
 program
   .command("connect")
   .argument("<provider>", "Which provider to connect (e.g. instaskul)")
@@ -57,6 +57,11 @@ program
     const config = loadConfig();
     if (!config.accessToken) {
       console.error("Not logged in. Run `botkit login` first.");
+      process.exit(1);
+    }
+
+    if (config.expiresAt !== undefined && config.expiresAt <= Date.now()) {
+      console.error("Your login has expired. Run `botkit login` again.");
       process.exit(1);
     }
 
@@ -91,7 +96,7 @@ program
       process.exit(1);
     }
   });
-  program.parseAsync(process.argv).catch((err) => {
-    console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-    process.exit(1);
-  });
+program.parseAsync(process.argv).catch((err) => {
+  console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+  process.exit(1);
+});
