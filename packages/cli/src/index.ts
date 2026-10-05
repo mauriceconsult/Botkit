@@ -71,6 +71,7 @@ program
         clientId: process.env.INSTASKUL_CLERK_OAUTH_CLIENT_ID!,
         callbackPort: 4322,
       });
+
       const res = await fetch(
         `${process.env.BOTKIT_REMOTE_MCP_URL}/connections`,
         {
@@ -91,6 +92,34 @@ program
         process.exit(1);
       }
       console.log("Instaskul connected.");
+    } else if (provider === "zuria") {
+      const tokens = await runOAuthConnect({
+        frontendApi: process.env.ZURIA_CLERK_FRONTEND_API!,
+        clientId: process.env.ZURIA_CLERK_OAUTH_CLIENT_ID!,
+        callbackPort: 4322,
+      });
+
+      const res = await fetch(
+        `${process.env.BOTKIT_REMOTE_MCP_URL}/connections`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${config.accessToken}`,
+          },
+          body: JSON.stringify({
+            provider: "zuria",
+            kind: "product_oauth",
+            tokens,
+          }),
+        },
+      );
+
+      if (!res.ok) {
+        console.error("Failed to save connection:", await res.text());
+        process.exit(1);
+      }
+      console.log("Zuria connected.");
     } else {
       console.error(`Unknown provider: ${provider}`);
       process.exit(1);

@@ -25,12 +25,42 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "")
   .split(",")
   .filter(Boolean);
 
+const VALID_KINDS = ["ai_byok", "ai_routed", "product_oauth"] as const;
+type ConnectionKind = (typeof VALID_KINDS)[number];
+
+function isValidKind(value: unknown): value is ConnectionKind {
+  return (
+    typeof value === "string" &&
+    (VALID_KINDS as readonly string[]).includes(value)
+  );
+}
+
+const VALID_PROVIDERS = [
+  "anthropic",
+  "openai",
+  "google",
+  "maxintel",
+  "instaskul",
+  "dukaboda",
+  "zuria",
+] as const;
+
+type ConnectionProvider = (typeof VALID_PROVIDERS)[number];
+
+function isValidProvider(value: unknown): value is ConnectionProvider {
+  return (
+    typeof value === "string" &&
+    (VALID_PROVIDERS as readonly string[]).includes(value)
+  );
+}
+
 export const app = new Hono();
 
 function sendUnauthorized(c: Context) {
+  const resourceBase = RESOURCE_URL.replace(/\/mcp$/, "");
   c.header(
     "WWW-Authenticate",
-    `Bearer resource_metadata="${RESOURCE_URL.replace(/\/mcp$/, "")}/.well-known/oauth-protected-resource"`,
+    `Bearer realm="${resourceBase}", resource_metadata="${resourceBase}/.well-known/oauth-protected-resource"`,
   );
   return c.json({ error: "Unauthorized" }, 401);
 }
@@ -78,7 +108,6 @@ app.all("/mcp", async (c) => {
   }
 
   const verification = await verifyClerkToken(token);
-
   if (!verification || verification.errors || !verification.data) {
     return sendUnauthorized(c);
   }
@@ -96,7 +125,6 @@ app.all("/mcp", async (c) => {
   return transport.handleRequest(c);
 });
 
-// apps/remote-mcp/src/index.ts — add alongside the existing /mcp route
 app.post("/connections", async (c) => {
   const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
   if (!token) return sendUnauthorized(c);
@@ -118,30 +146,22 @@ app.post("/connections", async (c) => {
   } catch {
     return c.json({ error: "Invalid JSON body" }, 400);
   }
+
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return c.json({ error: "Invalid connection body" }, 400);
   }
 
-  const { provider, kind, tokens } = body as Record<string, unknown>;
-  const providers = [
-    "anthropic",
-    "openai",
-    "google",
-    "maxintel",
-    "instaskul",
-    "dukaboda",
-    "zuria",
-  ];
-  const kinds = ["ai_byok", "ai_routed", "product_oauth"];
-  if (
-    typeof provider !== "string" ||
-    !providers.includes(provider) ||
-    typeof kind !== "string" ||
-    !kinds.includes(kind) ||
-    !tokens ||
-    typeof tokens !== "object" ||
-    Array.isArray(tokens)
-  ) {
+  const { provider, kind, tokens } = body as {
+    provider?: unknown;
+    kind?: unknown;
+    tokens?: unknown;
+  };
+
+  if (!isValidProvider(provider) || !isValidKind(kind)) {
+    return c.json({ error: "Invalid connection body" }, 400);
+  }
+
+  if (!tokens || typeof tokens !== "object" || Array.isArray(tokens)) {
     return c.json({ error: "Invalid connection body" }, 400);
   }
 
