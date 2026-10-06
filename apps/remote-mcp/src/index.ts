@@ -82,24 +82,36 @@ function isValidKind(value: unknown): value is ConnectionKind {
 }
 
 app.post("/connections", async (c) => {
-  const { isAuthenticated, toAuth } = await clerkClient.authenticateRequest(
-    c.req.raw,
-    {
-      acceptsToken: "oauth_token",
-    },
-  );
-  if (!isAuthenticated) return sendUnauthorized(c);
-  const { userId } = toAuth();
-  if (!userId) return sendUnauthorized(c);
+  try {
+    const { isAuthenticated, toAuth } = await clerkClient.authenticateRequest(
+      c.req.raw,
+      {
+        acceptsToken: "oauth_token",
+      },
+    );
+    if (!isAuthenticated) return sendUnauthorized(c);
+    const { userId } = toAuth();
+    if (!userId) return sendUnauthorized(c);
 
-  const { provider, kind, tokens } = await c.req.json();
-  if (!isValidProvider(provider))
-    return c.json({ error: `Invalid provider: ${provider}` }, 400);
-  if (!isValidKind(kind))
-    return c.json({ error: `Invalid kind: ${kind}` }, 400);
+    const { provider, kind, tokens } = await c.req.json();
+    if (!isValidProvider(provider))
+      return c.json({ error: `Invalid provider: ${provider}` }, 400);
+    if (!isValidKind(kind))
+      return c.json({ error: `Invalid kind: ${kind}` }, 400);
 
-  await saveConnection(userId, provider, kind, tokens);
-  return c.json({ status: "ok" });
+    await saveConnection(userId, provider, kind, tokens);
+    return c.json({ status: "ok" });
+  } catch (error) {
+    console.error("[CONNECTIONS_POST]", error);
+    return c.json(
+      {
+        error: "Internal error",
+        detail: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      },
+      500,
+    );
+  }
 });
 
 app.get("/health", (c) => c.json({ status: "ok" }));
