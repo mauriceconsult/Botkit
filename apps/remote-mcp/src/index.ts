@@ -13,7 +13,6 @@ if (!clerkPublishableKey || !clerkSecretKey) {
   throw new Error("Missing CLERK_PUBLISHABLE_KEY or CLERK_SECRET_KEY");
 }
 
-// const clerkClient = createClerkClient({ secretKey: clerkSecretKey });
 const clerkClient = createClerkClient({
   secretKey: clerkSecretKey,
   publishableKey: clerkPublishableKey,
@@ -107,14 +106,7 @@ app.post("/connections", async (c) => {
     return c.json({ status: "ok" });
   } catch (error) {
     console.error("[CONNECTIONS_POST]", error);
-    return c.json(
-      {
-        error: "Internal error",
-        detail: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-      },
-      500,
-    );
+    return c.json({ error: "Internal error" }, 500);
   }
 });
 
