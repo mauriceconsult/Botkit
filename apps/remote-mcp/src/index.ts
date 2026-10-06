@@ -1,172 +1,104 @@
 import { Hono, type Context } from "hono";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPTransport } from "@hono/mcp";
-import { verifyToken } from "@clerk/backend";
-import {
-  generateClerkProtectedResourceMetadata,
-  generateProtectedResourceMetadata,
-} from "@clerk/mcp-tools/server";
+import { createClerkClient } from "@clerk/backend";
+import { generateClerkProtectedResourceMetadata } from "@clerk/mcp-tools/server";
+import { registerAllTools } from "@botkit/mcp-tools";
+import { saveConnection } from "@botkit/core";
+// import { saveConnection } from "@botkit/core/connections.js"; // adjust path if different
 
-const clerkPublishableKey = process.env.CLERK_PUBLISHABLE_KEY?.trim().replace(
-  /^['"]|['"]$/g,
-  "",
-);
-const clerkFrontendApi = process.env.CLERK_FRONTEND_API?.trim().replace(
-  /^['"]|['"]$/g,
-  "",
-);
-const clerkSecretKey = process.env.CLERK_SECRET_KEY?.trim().replace(
-  /^['"]|['"]$/g,
-  "",
-);
+const clerkPublishableKey = process.env.CLERK_PUBLISHABLE_KEY;
+const clerkSecretKey = process.env.CLERK_SECRET_KEY;
+if (!clerkPublishableKey || !clerkSecretKey) {
+  throw new Error("Missing CLERK_PUBLISHABLE_KEY or CLERK_SECRET_KEY");
+}
+
+const clerkClient = createClerkClient({ secretKey: clerkSecretKey });
+
 const RESOURCE_URL =
   process.env.MCP_RESOURCE_URL ?? "http://localhost:3001/mcp";
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS ?? "")
-  .split(",")
-  .filter(Boolean);
-
-const VALID_KINDS = ["ai_byok", "ai_routed", "product_oauth"] as const;
-type ConnectionKind = (typeof VALID_KINDS)[number];
-
-function isValidKind(value: unknown): value is ConnectionKind {
-  return (
-    typeof value === "string" &&
-    (VALID_KINDS as readonly string[]).includes(value)
-  );
-}
-
-const VALID_PROVIDERS = [
-  "anthropic",
-  "openai",
-  "google",
-  "maxintel",
-  "instaskul",
-  "dukaboda",
-  "zuria",
-] as const;
-
-type ConnectionProvider = (typeof VALID_PROVIDERS)[number];
-
-function isValidProvider(value: unknown): value is ConnectionProvider {
-  return (
-    typeof value === "string" &&
-    (VALID_PROVIDERS as readonly string[]).includes(value)
-  );
-}
 
 export const app = new Hono();
 
 function sendUnauthorized(c: Context) {
-  const resourceBase = RESOURCE_URL.replace(/\/mcp$/, "");
   c.header(
     "WWW-Authenticate",
-    `Bearer realm="${resourceBase}", resource_metadata="${resourceBase}/.well-known/oauth-protected-resource"`,
+    `Bearer resource_metadata="${RESOURCE_URL.replace(/\/mcp$/, "")}/.well-known/oauth-protected-resource"`,
   );
   return c.json({ error: "Unauthorized" }, 401);
 }
 
-async function verifyClerkToken(token: string) {
-  if (!clerkSecretKey) return undefined;
-  try {
-    return await verifyToken(token, {
-      secretKey: clerkSecretKey,
-      authorizedParties: ALLOWED_ORIGINS,
-    });
-  } catch {
-    return undefined;
-  }
-}
-
-app.get("/.well-known/oauth-protected-resource", (c) => {
-  if (clerkFrontendApi?.startsWith("https://")) {
-    return c.json(
-      generateProtectedResourceMetadata({
-        authServerUrl: clerkFrontendApi,
-        resourceUrl: RESOURCE_URL,
-      }),
-    );
-  }
-  if (!clerkPublishableKey) {
-    return c.json(
-      { error: "Configure CLERK_PUBLISHABLE_KEY or CLERK_FRONTEND_API" },
-      503,
-    );
-  }
-  return c.json(
+app.get("/.well-known/oauth-protected-resource", (c) =>
+  c.json(
     generateClerkProtectedResourceMetadata({
       publishableKey: clerkPublishableKey,
       resourceUrl: RESOURCE_URL,
     }),
-  );
-});
+  ),
+);
 
 app.all("/mcp", async (c) => {
-  const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token) return sendUnauthorized(c);
-  if (!clerkSecretKey) {
-    return c.json({ error: "CLERK_SECRET_KEY is not configured" }, 503);
-  }
-
-  const verification = await verifyClerkToken(token);
-  if (!verification || verification.errors || !verification.data) {
-    return sendUnauthorized(c);
-  }
-
-  const claims = verification.data as { sub?: unknown };
-  const userId = typeof claims.sub === "string" ? claims.sub : undefined;
+  const { isAuthenticated, toAuth } = await clerkClient.authenticateRequest(
+    c.req.raw,
+    {
+      acceptsToken: "oauth_token",
+    },
+  );
+  if (!isAuthenticated) return sendUnauthorized(c);
+  const { userId } = toAuth();
   if (!userId) return sendUnauthorized(c);
 
   const server = new McpServer({ name: "botkit-remote-mcp", version: "0.0.1" });
-  const { registerAllTools } = await import("@botkit/mcp-tools");
   registerAllTools(server, { userId });
-
   const transport = new StreamableHTTPTransport();
   await server.connect(transport);
   return transport.handleRequest(c);
 });
 
+const allowedProviders = [
+  "anthropic",
+  "dukaboda",
+  "google",
+  "instaskul",
+  "maxintel",
+  "openai",
+  "zuria",
+] as const;
+type ConnectionProvider = (typeof allowedProviders)[number];
+const allowedKinds = ["ai_byok", "ai_routed", "product_oauth"] as const;
+type ConnectionKind = (typeof allowedKinds)[number];
+
+function isValidProvider(value: unknown): value is ConnectionProvider {
+  return (
+    typeof value === "string" &&
+    (allowedProviders as readonly string[]).includes(value)
+  );
+}
+function isValidKind(value: unknown): value is ConnectionKind {
+  return (
+    typeof value === "string" &&
+    (allowedKinds as readonly string[]).includes(value)
+  );
+}
+
 app.post("/connections", async (c) => {
-  const token = c.req.header("authorization")?.replace(/^Bearer\s+/i, "");
-  if (!token) return sendUnauthorized(c);
-  if (!clerkSecretKey) {
-    return c.json({ error: "CLERK_SECRET_KEY is not configured" }, 503);
-  }
+  const { isAuthenticated, toAuth } = await clerkClient.authenticateRequest(
+    c.req.raw,
+    {
+      acceptsToken: "oauth_token",
+    },
+  );
+  if (!isAuthenticated) return sendUnauthorized(c);
+  const { userId } = toAuth();
+  if (!userId) return sendUnauthorized(c);
 
-  const verification = await verifyClerkToken(token);
-  if (!verification || verification.errors || !verification.data) {
-    return sendUnauthorized(c);
-  }
+  const { provider, kind, tokens } = await c.req.json();
+  if (!isValidProvider(provider))
+    return c.json({ error: `Invalid provider: ${provider}` }, 400);
+  if (!isValidKind(kind))
+    return c.json({ error: `Invalid kind: ${kind}` }, 400);
 
-  const claims = verification.data as { sub?: string };
-  if (!claims.sub) return sendUnauthorized(c);
-
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: "Invalid JSON body" }, 400);
-  }
-
-  if (!body || typeof body !== "object" || Array.isArray(body)) {
-    return c.json({ error: "Invalid connection body" }, 400);
-  }
-
-  const { provider, kind, tokens } = body as {
-    provider?: unknown;
-    kind?: unknown;
-    tokens?: unknown;
-  };
-
-  if (!isValidProvider(provider) || !isValidKind(kind)) {
-    return c.json({ error: "Invalid connection body" }, 400);
-  }
-
-  if (!tokens || typeof tokens !== "object" || Array.isArray(tokens)) {
-    return c.json({ error: "Invalid connection body" }, 400);
-  }
-
-  const { saveConnection } = await import("@botkit/core");
-  await saveConnection(claims.sub, provider, kind, tokens);
+  await saveConnection(userId, provider, kind, tokens);
   return c.json({ status: "ok" });
 });
 
