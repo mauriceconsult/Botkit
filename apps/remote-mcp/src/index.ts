@@ -5,7 +5,7 @@ import { createClerkClient } from "@clerk/backend";
 import { generateClerkProtectedResourceMetadata } from "@clerk/mcp-tools/server";
 import { registerAllTools } from "@botkit/mcp-tools";
 import { saveConnection } from "@botkit/core";
-// import { saveConnection } from "@botkit/core/connections.js"; // adjust path if different
+
 
 const clerkPublishableKey = process.env.CLERK_PUBLISHABLE_KEY;
 const clerkSecretKey = process.env.CLERK_SECRET_KEY;
@@ -13,7 +13,11 @@ if (!clerkPublishableKey || !clerkSecretKey) {
   throw new Error("Missing CLERK_PUBLISHABLE_KEY or CLERK_SECRET_KEY");
 }
 
-const clerkClient = createClerkClient({ secretKey: clerkSecretKey });
+// const clerkClient = createClerkClient({ secretKey: clerkSecretKey });
+const clerkClient = createClerkClient({
+  secretKey: clerkSecretKey,
+  publishableKey: clerkPublishableKey,
+});
 
 const RESOURCE_URL =
   process.env.MCP_RESOURCE_URL ?? "http://localhost:3001/mcp";
